@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glacier Itinerary Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pine: #1B3A2D;
+    --pine-mid: #2D5A42;
+    --sage: #4A7C59;
+    --glacier: #5B9BAE;
+    --glacier-light: #A8D4DF;
+    --mist: #E8F2F0;
+    --snow: #F5FAF8;
+    --stone: #8B9E95;
+    --gold: #C4974A;
+    --gold-light: #F0DDB4;
+    --white: #FFFFFF;
+    --shadow: 0 4px 24px rgba(27,58,45,0.15);
+    --shadow-lg: 0 8px 48px rgba(27,58,45,0.25);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--pine);
+    color: var(--white);
+    min-height: 100vh;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 15% 50%, rgba(91,155,174,0.12) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 15%, rgba(74,124,89,0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 60% 85%, rgba(196,151,74,0.07) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    padding: 22px 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(27,58,45,0.7);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--glacier), var(--sage));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text h1 { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+  .logo-text p { font-size: 11px; color: var(--glacier-light); letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; }
+  .header-status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--stone); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #F87171; }
+  .status-dot.connected { background: #4ADE80; }
+
+  .setup-banner {
+    background: linear-gradient(135deg, rgba(196,151,74,0.15), rgba(91,155,174,0.1));
+    border: 1px solid rgba(196,151,74,0.3);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin: 24px 36px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .setup-banner.hidden { display: none; }
+  .setup-icon { font-size: 22px; margin-top: 2px; }
+  .setup-content h3 { font-size: 14px; font-weight: 600; color: var(--gold-light); margin-bottom: 6px; }
+  .setup-content p { font-size: 13px; color: var(--stone); line-height: 1.6; }
+  .setup-inputs { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .setup-input {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--white);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    width: 280px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .setup-input:focus { border-color: var(--glacier); }
+  .setup-input::placeholder { color: var(--stone); }
+  .btn-connect {
+    background: var(--glacier); color: var(--white); border: none;
+    border-radius: 8px; padding: 8px 18px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .btn-connect:hover { background: var(--glacier-light); color: var(--pine); }
+
+  .main {
+    display: grid;
+    grid-template-columns: 290px 1fr 330px;
+    flex: 1;
+  }
+
+  .filter-panel {
+    background: rgba(0,0,0,0.2);
+    border-right: 1px solid rgba(255,255,255,0.07);
+    padding: 28px 22px;
+    overflow-y: auto;
+    height: calc(100vh - 72px);
+    position: sticky;
+    top: 72px;
+  }
+  .panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--stone); margin-bottom: 20px; }
+  .filter-group { margin-bottom: 24px; }
+  .filter-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--glacier-light); margin-bottom: 9px; display: block; }
+  .toggle-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .toggle-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: var(--stone);
+    cursor: pointer;
+    transition: all 0.18s;
+    white-space: nowrap;
+  }
+  .toggle-btn:hover { background: rgba(91,155,174,0.15); border-color: var(--glacier); color: var(--white); }
+  .toggle-btn.active { background: var(--glacier); border-color: var(--glacier); color: var(--white); font-weight: 600; }
+  .toggle-btn.active.gold { background: var(--gold); border-color: var(--gold); }
+  .toggle-btn.active.sage { background: var(--sage); border-color: var(--sage); }
+  .filter-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0 20px; }
+  .btn-reset {
+    width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 9px; color: var(--stone);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.18s;
+  }
+  .btn-reset:hover { border-color: var(--stone); color: var(--white); }
+
+  .content-area { padding: 28px; overflow-y: auto; height: calc(100vh - 72px); }
+  .content-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .content-header h2 { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 600; }
+  .result-count { font-size: 12px; color: var(--stone); background: rgba(255,255,255,0.06); padding: 4px 12px; border-radius: 20px; }
+
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 13px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--glacier), var(--sage));
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .card:hover { background: rgba(91,155,174,0.1); border-color: rgba(91,155,174,0.3); transform: translateY(-2px); box-shadow: var(--shadow); }
+  .card:hover::before { opacity: 1; }
+  .card.selected { background: rgba(91,155,174,0.15); border-color: var(--glacier); box-shadow: 0 0 0 1px var(--glacier); }
+  .card.selected::before { opacity: 1; }
+  .card-check {
+    position: absolute; top: 12px; right: 12px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--glacier);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; opacity: 0; transform: scale(0.7); transition: all 0.18s;
+  }
+  .card.selected .card-check { opacity: 1; transform: scale(1); }
+  .card-type { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; margin-bottom: 7px; }
+  .type-hiking { background: rgba(74,124,89,0.3); color: #86EFAC; }
+  .type-sightseeing { background: rgba(91,155,174,0.3); color: var(--glacier-light); }
+  .type-overview { background: rgba(196,151,74,0.3); color: var(--gold-light); }
+  .type-logistics { background: rgba(139,158,149,0.3); color: #D1D5DB; }
+  .type-business { background: rgba(168,107,74,0.3); color: #FCA5A5; }
+  .type-wildlife { background: rgba(132,90,169,0.3); color: #C4B5FD; }
+  .type-seasonal { background: rgba(56,130,167,0.3); color: #93C5FD; }
+  .type-offerings { background: rgba(16,123,90,0.3); color: #6EE7B7; }
+  .type-other { background: rgba(100,100,100,0.3); color: #D1D5DB; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--white); margin-bottom: 5px; line-height: 1.35; padding-right: 26px; }
+  .card-notes { font-size: 11px; color: var(--stone); margin-top: 6px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .meta-tag { font-size: 10px; color: var(--stone); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--stone); grid-column: 1 / -1; }
+  .empty-state .empty-icon { font-size: 38px; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 16px; color: var(--white); margin-bottom: 6px; }
+  .empty-state p { font-size: 13px; line-height: 1.6; }
+  .loading-state { text-align: center; padding: 60px 20px; color: var(--stone); grid-column: 1 / -1; }
+  .spinner { width: 28px; height: 28px; border: 3px solid rgba(91,155,174,0.2); border-top-color: var(--glacier); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .itinerary-panel {
+    background: rgba(0,0,0,0.25);
+    border-left: 1px solid rgba(255,255,255,0.07);
+    padding: 28px 20px;
+    overflow-y: auto;
+    height: calc(100vh - 72px);
+    position: sticky;
+    top: 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .itinerary-subtitle { font-size: 12px; color: var(--stone); margin-bottom: 16px; line-height: 1.5; }
+
+  .trip-name-input {
+    width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 9px 13px; color: var(--white);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s;
+    margin-bottom: 14px;
+  }
+  .trip-name-input:focus { border-color: var(--glacier); }
+  .trip-name-input::placeholder { color: var(--stone); }
+
+  .drop-zone {
+    flex: 1; min-height: 180px;
+    border: 1.5px dashed rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 12px; margin-bottom: 14px;
+    transition: border-color 0.2s;
+  }
+  .drop-zone.drag-over { border-color: var(--glacier); background: rgba(91,155,174,0.05); }
+  .drop-zone-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 150px; color: var(--stone); text-align: center; gap: 8px; }
+  .drop-zone-empty .dz-icon { font-size: 26px; opacity: 0.4; }
+  .drop-zone-empty p { font-size: 12px; line-height: 1.5; }
+
+  .itinerary-item {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 9px; padding: 10px 12px; margin-bottom: 7px;
+    display: flex; align-items: flex-start; gap: 9px;
+    cursor: grab; transition: all 0.18s;
+  }
+  .itinerary-item:active { cursor: grabbing; }
+  .itinerary-item.dragging { opacity: 0.3; }
+  .itinerary-item:hover { background: rgba(255,255,255,0.09); }
+  .item-num { width: 20px; height: 20px; min-width: 20px; background: var(--glacier); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; margin-top: 1px; }
+  .item-content { flex: 1; min-width: 0; }
+  .item-title { font-size: 12px; font-weight: 600; line-height: 1.3; }
+  .item-type { font-size: 10px; color: var(--stone); margin-top: 2px; }
+  .item-remove { background: none; border: none; color: var(--stone); cursor: pointer; font-size: 13px; padding: 0; line-height: 1; transition: color 0.15s; flex-shrink: 0; }
+  .item-remove:hover { color: #F87171; }
+  .drag-handle { color: var(--stone); font-size: 11px; cursor: grab; flex-shrink: 0; padding-top: 2px; }
+
+  .itinerary-actions { display: flex; flex-direction: column; gap: 9px; }
+  .btn-canva {
+    width: 100%; background: linear-gradient(135deg, #7B61FF, #00C4CC);
+    color: var(--white); border: none; border-radius: 10px; padding: 13px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-canva:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(123,97,255,0.4); }
+  .btn-canva:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-clear {
+    width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 9px; padding: 9px; color: var(--stone);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.18s;
+  }
+  .btn-clear:hover { border-color: var(--stone); color: var(--white); }
+
+  .notification {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--pine-mid); border: 1px solid rgba(91,155,174,0.4);
+    border-radius: 10px; padding: 11px 20px; font-size: 13px; color: var(--glacier-light);
+    box-shadow: var(--shadow-lg); transition: transform 0.3s ease; z-index: 200; white-space: nowrap;
+  }
+  .notification.show { transform: translateX(-50%) translateY(0); }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px); z-index: 300;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: all; }
+  .modal {
+    background: #1E3D2F; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 18px; padding: 32px; max-width: 480px; width: 90%;
+    box-shadow: var(--shadow-lg); transform: translateY(10px); transition: transform 0.2s;
+  }
+  .modal-overlay.show .modal { transform: translateY(0); }
+  .modal h3 { font-family: 'Playfair Display', serif; font-size: 20px; margin-bottom: 10px; }
+  .modal p { font-size: 13px; color: var(--stone); line-height: 1.7; margin-bottom: 16px; }
+  .modal-step { display: flex; gap: 12px; margin-bottom: 12px; align-items: flex-start; }
+  .step-num { width: 22px; height: 22px; min-width: 22px; background: var(--glacier); border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .step-text { font-size: 13px; color: var(--stone); line-height: 1.5; }
+  .step-text strong { color: var(--white); }
+  .modal-code { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 12px; color: var(--glacier-light); margin-bottom: 20px; word-break: break-all; }
+  .modal-btns { display: flex; gap: 10px; }
+  .modal-btn { flex: 1; padding: 11px; border-radius: 9px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.18s; border: none; }
+  .modal-btn.primary { background: var(--glacier); color: var(--white); }
+  .modal-btn.primary:hover { background: var(--glacier-light); color: var(--pine); }
+  .modal-btn.secondary { background: rgba(255,255,255,0.07); color: var(--stone); }
+  .modal-btn.secondary:hover { color: var(--white); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🏔</div>
+      <div class="logo-text">
+        <h1>Glacier Itinerary Builder</h1>
+        <p>Personal Dashboard · Brittany in MT</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Not connected</span>
+    </div>
+  </header>
+
+  <div class="setup-banner" id="setupBanner">
+    <div class="setup-icon">🔑</div>
+    <div class="setup-content">
+      <h3>Connect your Notion database to get started</h3>
+      <p>Enter your Notion API key below. It's stored only in your browser and never shared anywhere. <a href="#" onclick="showSetupModal()" style="color:var(--glacier-light)">How do I get my API key?</a></p>
+      <div class="setup-inputs">
+        <input class="setup-input" id="notionKey" type="password" placeholder="Notion API Key (secret_...)" />
+        <input class="setup-input" id="notionDbId" type="text" placeholder="Database ID" style="width:260px" />
+        <button class="btn-connect" onclick="connectNotion()">Connect</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- FILTERS -->
+    <div class="filter-panel">
+      <div class="panel-title">Filters</div>
+
+      <div class="filter-group">
+        <span class="filter-label">Trip Length</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="1-Day" onclick="toggleFilter(this)">1 Day</button>
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="3-Day" onclick="toggleFilter(this)">3 Days</button>
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="7-Day" onclick="toggleFilter(this)">7 Days</button>
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="Any Length" onclick="toggleFilter(this)">Any</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+
+      <div class="filter-group">
+        <span class="filter-label">Season</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn" data-filter="season" data-value="Summer" onclick="toggleFilter(this)">☀️ Summer</button>
+          <button class="toggle-btn" data-filter="season" data-value="Fall" onclick="toggleFilter(this)">🍂 Fall</button>
+          <button class="toggle-btn" data-filter="season" data-value="Winter" onclick="toggleFilter(this)">❄️ Winter</button>
+          <button class="toggle-btn" data-filter="season" data-value="Spring" onclick="toggleFilter(this)">🌱 Spring</button>
+          <button class="toggle-btn" data-filter="season" data-value="Year-Round" onclick="toggleFilter(this)">🗓 Year-Round</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+
+      <div class="filter-group">
+        <span class="filter-label">Area of Park</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn sage" data-filter="area" data-value="Going-to-the-Sun Road" onclick="toggleFilter(this)">GTSR</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="West Side / Lake McDonald" onclick="toggleFilter(this)">West Side</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="East Side / St. Mary" onclick="toggleFilter(this)">East Side</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Many Glacier" onclick="toggleFilter(this)">Many Glacier</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Two Medicine" onclick="toggleFilter(this)">Two Medicine</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="North Fork / Polebridge" onclick="toggleFilter(this)">North Fork</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Cut Bank" onclick="toggleFilter(this)">Cut Bank</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Apgar" onclick="toggleFilter(this)">Apgar</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Waterton" onclick="toggleFilter(this)">Waterton</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Park-Wide" onclick="toggleFilter(this)">Park-Wide</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+
+      <div class="filter-group">
+        <span class="filter-label">Content Type</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn" data-filter="contentType" data-value="Hiking" onclick="toggleFilter(this)">🥾 Hiking</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Sightseeing" onclick="toggleFilter(this)">📸 Sightseeing</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Businesses & Services" onclick="toggleFilter(this)">🍽 Businesses</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Wildlife & Safety" onclick="toggleFilter(this)">🐻 Wildlife</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Travel Info & Logistics" onclick="toggleFilter(this)">🚗 Logistics</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Park Overview" onclick="toggleFilter(this)">🏔 Overview</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Seasonal" onclick="toggleFilter(this)">🗓 Seasonal</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Park Offerings" onclick="toggleFilter(this)">⛺ Offerings</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+
+      <div class="filter-group">
+        <span class="filter-label">Difficulty</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn" data-filter="difficulty" data-value="Easy" onclick="toggleFilter(this)">Easy</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="Moderate" onclick="toggleFilter(this)">Moderate</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="Strenuous" onclick="toggleFilter(this)">Strenuous</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="Very Strenuous" onclick="toggleFilter(this)">Very Strenuous</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="N/A" onclick="toggleFilter(this)">N/A</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+
+      <div class="filter-group">
+        <span class="filter-label">Itinerary Ready</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn active" id="readyBtn" onclick="toggleReady(this)">✅ Ready only</button>
+        </div>
+      </div>
+
+      <button class="btn-reset" onclick="resetFilters()">↺ Reset all filters</button>
+    </div>
+
+    <!-- CARDS -->
+    <div class="content-area">
+      <div class="content-header">
+        <h2>Content Library</h2>
+        <span class="result-count" id="resultCount">— items</span>
+      </div>
+      <div class="cards-grid" id="cardsGrid">
+        <div class="loading-state">
+          <div style="font-size:36px;margin-bottom:14px">🏔</div>
+          <p>Connect Notion above to load your content library</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ITINERARY PANEL -->
+    <div class="itinerary-panel">
+      <div class="panel-title">Itinerary Builder</div>
+      <p class="itinerary-subtitle">Click cards to add · Drag to reorder</p>
+
+      <input class="trip-name-input" id="tripName" placeholder="Name this itinerary (e.g. 3-Day Summer Hiker)" />
+
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-empty" id="dropEmpty">
+          <div class="dz-icon">📋</div>
+          <p>Select content cards from the library to build your itinerary</p>
+        </div>
+        <div id="itineraryItems"></div>
+      </div>
+
+      <div class="itinerary-actions">
+        <button class="btn-canva" id="canvaBtn" onclick="buildInCanva()" disabled>
+          <span>✦</span> Build in Canva
+        </button>
+        <button class="btn-clear" onclick="clearItinerary()">Clear itinerary</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notification" id="notification"></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="setupModal">
+  <div class="modal">
+    <h3>🔑 Getting your Notion credentials</h3>
+    <p>You need two things: a Notion API key and your Database ID.</p>
+    <div class="modal-step">
+      <div class="step-num">1</div>
+      <div class="step-text">Go to <strong>notion.so/my-integrations</strong>, create a new integration called "Glacier Dashboard", and copy the <strong>Internal Integration Secret</strong>.</div>
+    </div>
+    <div class="modal-step" style="margin-top:10px">
+      <div class="step-num">2</div>
+      <div class="step-text">Open your <strong>Glacier Content Database</strong> in Notion → click ••• menu → Connections → connect your integration.</div>
+    </div>
+    <div class="modal-step" style="margin-top:10px;margin-bottom:16px">
+      <div class="step-num">3</div>
+      <div class="step-text">Your Database ID is already pre-filled below — it comes from your Notion database URL.</div>
+    </div>
+    <div class="modal-code">Database ID: 97dd5dd0-a8b1-42fc-957b-44e9500e36ed</div>
+    <div class="modal-btns">
+      <button class="modal-btn primary" onclick="window.open('https://www.notion.so/my-integrations','_blank')">Open Notion Integrations ↗</button>
+      <button class="modal-btn secondary" onclick="closeModal()">Got it</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = {
+  notionKey: localStorage.getItem('glacierNotionKey') || '',
+  notionDbId: localStorage.getItem('glacierDbId') || '97dd5dd0-a8b1-42fc-957b-44e9500e36ed',
+  allCards: [],
+  selectedIds: new Set(),
+  itinerary: [],
+  filters: { tripLength: [], season: [], area: [], contentType: [], difficulty: [] },
+  readyOnly: true,
+  dragSrcIndex: null
+};
+
+window.onload = () => {
+  document.getElementById('notionDbId').value = state.notionDbId;
+  if (state.notionKey) {
+    document.getElementById('notionKey').value = state.notionKey;
+    document.getElementById('setupBanner').classList.add('hidden');
+    loadNotionData();
+  }
+};
+
+async function connectNotion() {
+  const key = document.getElementById('notionKey').value.trim();
+  const dbId = document.getElementById('notionDbId').value.trim();
+  if (!key) { showNotification('Please enter your Notion API key'); return; }
+  state.notionKey = key;
+  state.notionDbId = dbId;
+  localStorage.setItem('glacierNotionKey', key);
+  localStorage.setItem('glacierDbId', dbId);
+  document.getElementById('setupBanner').classList.add('hidden');
+  await loadNotionData();
+}
+
+async function loadNotionData() {
+  setStatus(false, 'Loading...');
+  document.getElementById('cardsGrid').innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading from Notion...</p></div>';
+  try {
+    const rows = await fetchAllPages();
+    state.allCards = rows;
+    setStatus(true, `${rows.length} items loaded`);
+    applyFilters();
+    showNotification(`✅ Loaded ${rows.length} items from Notion`);
+  } catch(e) {
+    setStatus(false, 'Connection failed');
+    showNotification('❌ Could not connect — check your API key');
+    document.getElementById('cardsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Connection failed</h3><p>Check your Notion API key and make sure your integration has access to the database.</p></div>';
+  }
+}
+
+async function fetchAllPages() {
+  const PROXY = 'https://api.allorigins.win/raw?url=';
+  const url = `https://api.notion.com/v1/databases/${state.notionDbId}/query`;
+  let all = [], cursor = null;
+  do {
+    const body = { page_size: 100 };
+    if (cursor) body.start_cursor = cursor;
+    const res = await fetch(PROXY + encodeURIComponent(url), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Notion-Version': '2022-06-28',
+        'Authorization': `Bearer ${state.notionKey}`
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    all = all.concat(data.results || []);
+    cursor = data.has_more ? data.next_cursor : null;
+  } while (cursor);
+  return all.map(parsePage).filter(Boolean);
+}
+
+function parsePage(page) {
+  try {
+    const p = page.properties;
+    return {
+      id: page.id,
+      title: p['Content Title']?.title?.[0]?.plain_text || 'Untitled',
+      contentType: p['Content Type']?.select?.name || '',
+      area: (p['Area of Park']?.multi_select || []).map(o => o.name),
+      season: (p['Season']?.multi_select || []).map(o => o.name),
+      tripLength: (p['Trip Length']?.multi_select || []).map(o => o.name),
+      difficulty: p['Difficulty']?.select?.name || '',
+      itineraryReady: p['Itinerary Ready']?.select?.name || '',
+      notes: p['Notes']?.rich_text?.[0]?.plain_text || '',
+      tiktokUrl: p['TikTok Source']?.url || ''
+    };
+  } catch { return null; }
+}
+
+function toggleFilter(btn) {
+  const key = btn.dataset.filter;
+  const val = btn.dataset.value;
+  const arr = state.filters[key];
+  const idx = arr.indexOf(val);
+  if (idx > -1) { arr.splice(idx, 1); btn.classList.remove('active'); }
+  else { arr.push(val); btn.classList.add('active'); }
+  applyFilters();
+}
+
+function toggleReady(btn) {
+  state.readyOnly = !state.readyOnly;
+  btn.classList.toggle('active', state.readyOnly);
+  applyFilters();
+}
+
+function resetFilters() {
+  state.filters = { tripLength: [], season: [], area: [], contentType: [], difficulty: [] };
+  state.readyOnly = true;
+  document.querySelectorAll('.toggle-btn[data-filter]').forEach(b => b.classList.remove('active'));
+  document.getElementById('readyBtn').classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  let cards = state.allCards;
+  const f = state.filters;
+  if (state.readyOnly) cards = cards.filter(c => c.itineraryReady === '✅ Yes');
+  if (f.tripLength.length) cards = cards.filter(c => f.tripLength.some(v => c.tripLength.includes(v) || c.tripLength.includes('Any Length')));
+  if (f.season.length) cards = cards.filter(c => f.season.some(v => c.season.includes(v) || c.season.includes('Year-Round')));
+  if (f.area.length) cards = cards.filter(c => f.area.some(v => c.area.includes(v) || c.area.includes('Park-Wide')));
+  if (f.contentType.length) cards = cards.filter(c => f.contentType.includes(c.contentType));
+  if (f.difficulty.length) cards = cards.filter(c => f.difficulty.includes(c.difficulty));
+  document.getElementById('resultCount').textContent = `${cards.length} items`;
+  renderCards(cards);
+}
+
+const typeClassMap = {
+  'Hiking': 'type-hiking', 'Sightseeing': 'type-sightseeing',
+  'Park Overview': 'type-overview', 'Travel Info & Logistics': 'type-logistics',
+  'Businesses & Services': 'type-business', 'Wildlife & Safety': 'type-wildlife',
+  'Seasonal': 'type-seasonal', 'Park Offerings': 'type-offerings'
+};
+
+function renderCards(cards) {
+  const grid = document.getElementById('cardsGrid');
+  if (!cards.length && state.allCards.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><h3>No matches</h3><p>Try adjusting your filters.</p></div>';
+    return;
+  }
+  if (!cards.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🏔</div><h3>No content yet</h3><p>Connect Notion to load your library.</p></div>';
+    return;
+  }
+  grid.innerHTML = cards.map(card => {
+    const sel = state.selectedIds.has(card.id);
+    const cls = typeClassMap[card.contentType] || 'type-other';
+    const tags = [...new Set([...card.area.slice(0,2), ...card.season.slice(0,1)])];
+    return `<div class="card ${sel ? 'selected' : ''}" onclick="toggleCard('${card.id}', this)" data-id="${card.id}">
+      <div class="card-check">✓</div>
+      <div class="card-type ${cls}">${card.contentType || 'Other'}</div>
+      <div class="card-title">${card.title}</div>
+      ${card.notes ? `<div class="card-notes">${card.notes}</div>` : ''}
+      <div class="card-meta">
+        ${card.difficulty && card.difficulty !== 'N/A' ? `<span class="meta-tag">⛰ ${card.difficulty}</span>` : ''}
+        ${tags.map(t => `<span class="meta-tag">${t}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(id, el) {
+  const card = state.allCards.find(c => c.id === id);
+  if (!card) return;
+  if (state.selectedIds.has(id)) {
+    state.selectedIds.delete(id);
+    el.classList.remove('selected');
+    state.itinerary = state.itinerary.filter(c => c.id !== id);
+  } else {
+    state.selectedIds.add(id);
+    el.classList.add('selected');
+    state.itinerary.push(card);
+    showNotification(`Added: ${card.title}`);
+  }
+  renderItinerary();
+}
+
+function renderItinerary() {
+  const container = document.getElementById('itineraryItems');
+  const empty = document.getElementById('dropEmpty');
+  const btn = document.getElementById('canvaBtn');
+  if (!state.itinerary.length) {
+    container.innerHTML = ''; empty.style.display = 'flex'; btn.disabled = true; return;
+  }
+  empty.style.display = 'none'; btn.disabled = false;
+  container.innerHTML = state.itinerary.map((card, i) => `
+    <div class="itinerary-item" draggable="true"
+      ondragstart="dragStart(event,${i})" ondragover="dragOver(event,${i})"
+      ondrop="dragDrop(event,${i})" ondragend="dragEnd()">
+      <span class="drag-handle">⠿</span>
+      <div class="item-num">${i+1}</div>
+      <div class="item-content">
+        <div class="item-title">${card.title}</div>
+        <div class="item-type">${card.contentType}</div>
+      </div>
+      <button class="item-remove" onclick="removeItem('${card.id}')">✕</button>
+    </div>`).join('');
+}
+
+function removeItem(id) {
+  state.itinerary = state.itinerary.filter(c => c.id !== id);
+  state.selectedIds.delete(id);
+  const el = document.querySelector(`.card[data-id="${id}"]`);
+  if (el) el.classList.remove('selected');
+  renderItinerary();
+}
+
+function clearItinerary() {
+  state.itinerary = []; state.selectedIds.clear();
+  document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+  renderItinerary();
+}
+
+function dragStart(e, i) { state.dragSrcIndex = i; setTimeout(() => e.target.classList.add('dragging'), 0); }
+function dragOver(e, i) { e.preventDefault(); }
+function dragDrop(e, i) {
+  e.preventDefault();
+  if (state.dragSrcIndex === null || state.dragSrcIndex === i) return;
+  const moved = state.itinerary.splice(state.dragSrcIndex, 1)[0];
+  state.itinerary.splice(i, 0, moved);
+  renderItinerary();
+}
+function dragEnd() {
+  state.dragSrcIndex = null;
+  document.querySelectorAll('.itinerary-item.dragging').forEach(el => el.classList.remove('dragging'));
+}
+
+async function buildInCanva() {
+  if (!state.itinerary.length) return;
+  const name = document.getElementById('tripName').value || 'Glacier National Park Itinerary';
+  const btn = document.getElementById('canvaBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;margin:0"></div> Building...';
+
+  const sections = state.itinerary.map((c,i) => `${i+1}. ${c.title}${c.notes ? ` — ${c.notes.slice(0,100)}` : ''}`).join('\n');
+  const query = encodeURIComponent(`${name} — Glacier National Park travel itinerary document with teal and forest green palette. Sections: ${sections.slice(0, 400)}`);
+  window.open(`https://www.canva.com/create/documents/?query=${query}`, '_blank');
+  showNotification('✦ Opening Canva with your itinerary!');
+
+  btn.disabled = false;
+  btn.innerHTML = '<span>✦</span> Build in Canva';
+}
+
+function setStatus(ok, text) {
+  document.getElementById('statusDot').className = 'status-dot' + (ok ? ' connected' : '');
+  document.getElementById('statusText').textContent = text;
+}
+function showNotification(msg) {
+  const el = document.getElementById('notification');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+function showSetupModal() { document.getElementById('setupModal').classList.add('show'); }
+function closeModal() { document.getElementById('setupModal').classList.remove('show'); }
+</script>
+</body>
+</html>
