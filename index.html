@@ -325,6 +325,7 @@
     <div class="header-status">
       <div class="status-dot" id="statusDot"></div>
       <span id="statusText">Not connected</span>
+      <button onclick="showReconnect()" style="margin-left:10px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 10px;color:var(--stone);font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer;">↺ Reconnect</button>
     </div>
   </header>
 
@@ -510,6 +511,14 @@ window.onload = () => {
   }
 };
 
+function showReconnect() {
+  localStorage.removeItem('glacierNotionKey');
+  state.notionKey = '';
+  document.getElementById('notionKey').value = '';
+  document.getElementById('setupBanner').classList.remove('hidden');
+  document.getElementById('setupBanner').scrollIntoView({ behavior: 'smooth' });
+}
+
 async function connectNotion() {
   const key = document.getElementById('notionKey').value.trim();
   const dbId = document.getElementById('notionDbId').value.trim();
@@ -534,7 +543,9 @@ async function loadNotionData() {
   } catch(e) {
     setStatus(false, 'Connection failed');
     showNotification('❌ Could not connect — check your API key');
-    document.getElementById('cardsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Connection failed</h3><p>Check your Notion API key and make sure your integration has access to the database.</p></div>';
+    document.getElementById('setupBanner').classList.remove('hidden');
+    document.getElementById('notionKey').value = '';
+    document.getElementById('cardsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><h3>Connection failed</h3><p>Check your API key and make sure your integration is connected to the database in Notion.</p></div>';
   }
 }
 
