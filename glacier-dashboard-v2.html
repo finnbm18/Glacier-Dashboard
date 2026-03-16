@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glacier Itinerary Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pine: #1B3A2D; --pine-mid: #2D5A42; --sage: #4A7C59;
+    --glacier: #5B9BAE; --glacier-light: #A8D4DF;
+    --stone: #8B9E95; --gold: #C4974A; --gold-light: #F0DDB4; --white: #FFFFFF;
+    --shadow: 0 4px 24px rgba(27,58,45,0.15);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--pine); color: var(--white); min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse at 15% 50%, rgba(91,155,174,0.12) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 15%, rgba(74,124,89,0.15) 0%, transparent 50%);
+  }
+  .app { position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100vh; }
+  header {
+    padding: 20px 32px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(27,58,45,0.7);
+    backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, var(--glacier), var(--sage)); border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo-text h1 { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; }
+  .logo-text p { font-size: 10px; color: var(--glacier-light); letter-spacing: 0.08em; text-transform: uppercase; }
+  .header-right { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--stone); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ADE80; }
+  .main { display: grid; grid-template-columns: 280px 1fr 320px; flex: 1; }
+
+  /* FILTERS */
+  .filter-panel { background: rgba(0,0,0,0.2); border-right: 1px solid rgba(255,255,255,0.07); padding: 24px 20px; overflow-y: auto; height: calc(100vh - 68px); position: sticky; top: 68px; }
+  .panel-title { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--stone); margin-bottom: 18px; }
+  .filter-group { margin-bottom: 20px; }
+  .filter-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--glacier-light); margin-bottom: 8px; display: block; }
+  .toggle-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+  .toggle-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 4px 11px; font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--stone); cursor: pointer; transition: all 0.18s; white-space: nowrap; }
+  .toggle-btn:hover { background: rgba(91,155,174,0.15); border-color: var(--glacier); color: var(--white); }
+  .toggle-btn.active { background: var(--glacier); border-color: var(--glacier); color: var(--white); font-weight: 600; }
+  .toggle-btn.active.gold { background: var(--gold); border-color: var(--gold); }
+  .toggle-btn.active.sage { background: var(--sage); border-color: var(--sage); }
+  .filter-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0 18px; }
+  .btn-reset { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px; color: var(--stone); font-family: 'DM Sans', sans-serif; font-size: 11px; cursor: pointer; transition: all 0.18s; }
+  .btn-reset:hover { border-color: var(--stone); color: var(--white); }
+
+  /* CARDS */
+  .content-area { padding: 24px; overflow-y: auto; height: calc(100vh - 68px); }
+  .content-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .content-header h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 600; }
+  .result-count { font-size: 11px; color: var(--stone); background: rgba(255,255,255,0.06); padding: 3px 10px; border-radius: 20px; }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 11px; }
+  .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--glacier), var(--sage)); opacity: 0; transition: opacity 0.2s; }
+  .card:hover { background: rgba(91,155,174,0.1); border-color: rgba(91,155,174,0.3); transform: translateY(-2px); }
+  .card:hover::before { opacity: 1; }
+  .card.selected { background: rgba(91,155,174,0.15); border-color: var(--glacier); box-shadow: 0 0 0 1px var(--glacier); }
+  .card.selected::before { opacity: 1; }
+  .card-check { position: absolute; top: 10px; right: 10px; width: 19px; height: 19px; border-radius: 50%; background: var(--glacier); display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0; transform: scale(0.7); transition: all 0.18s; }
+  .card.selected .card-check { opacity: 1; transform: scale(1); }
+  .card-type { display: inline-block; font-size: 9px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; margin-bottom: 6px; }
+  .type-hiking { background: rgba(74,124,89,0.3); color: #86EFAC; }
+  .type-sightseeing { background: rgba(91,155,174,0.3); color: var(--glacier-light); }
+  .type-overview { background: rgba(196,151,74,0.3); color: var(--gold-light); }
+  .type-logistics { background: rgba(139,158,149,0.3); color: #D1D5DB; }
+  .type-business { background: rgba(168,107,74,0.3); color: #FCA5A5; }
+  .type-wildlife { background: rgba(132,90,169,0.3); color: #C4B5FD; }
+  .type-seasonal { background: rgba(56,130,167,0.3); color: #93C5FD; }
+  .type-offerings { background: rgba(16,123,90,0.3); color: #6EE7B7; }
+  .type-other { background: rgba(100,100,100,0.3); color: #D1D5DB; }
+  .card-title { font-size: 12px; font-weight: 600; color: var(--white); margin-bottom: 4px; line-height: 1.3; padding-right: 22px; }
+  .card-notes { font-size: 11px; color: var(--stone); margin-top: 5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .card-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+  .meta-tag { font-size: 10px; color: var(--stone); background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 3px; }
+  .empty-state { text-align: center; padding: 50px 20px; color: var(--stone); grid-column: 1/-1; }
+  .empty-state .ei { font-size: 32px; margin-bottom: 10px; }
+  .empty-state h3 { font-size: 15px; color: var(--white); margin-bottom: 5px; }
+  .empty-state p { font-size: 12px; line-height: 1.6; }
+
+  /* ITINERARY */
+  .itinerary-panel { background: rgba(0,0,0,0.25); border-left: 1px solid rgba(255,255,255,0.07); padding: 24px 18px; overflow-y: auto; height: calc(100vh - 68px); position: sticky; top: 68px; display: flex; flex-direction: column; }
+  .itinerary-subtitle { font-size: 11px; color: var(--stone); margin-bottom: 14px; line-height: 1.5; }
+  .trip-name-input { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px; padding: 8px 12px; color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 12px; outline: none; transition: border-color 0.2s; margin-bottom: 12px; }
+  .trip-name-input:focus { border-color: var(--glacier); }
+  .trip-name-input::placeholder { color: var(--stone); }
+  .drop-zone { flex: 1; min-height: 160px; border: 1.5px dashed rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+  .drop-zone-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 140px; color: var(--stone); text-align: center; gap: 7px; }
+  .drop-zone-empty .dz-icon { font-size: 24px; opacity: 0.4; }
+  .drop-zone-empty p { font-size: 11px; line-height: 1.5; }
+  .itinerary-item { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 9px 11px; margin-bottom: 6px; display: flex; align-items: flex-start; gap: 8px; cursor: grab; transition: all 0.18s; }
+  .itinerary-item:active { cursor: grabbing; }
+  .itinerary-item.dragging { opacity: 0.3; }
+  .itinerary-item:hover { background: rgba(255,255,255,0.09); }
+  .item-num { width: 18px; height: 18px; min-width: 18px; background: var(--glacier); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; margin-top: 1px; }
+  .item-content { flex: 1; min-width: 0; }
+  .item-title { font-size: 12px; font-weight: 600; line-height: 1.3; }
+  .item-type { font-size: 10px; color: var(--stone); margin-top: 1px; }
+  .item-remove { background: none; border: none; color: var(--stone); cursor: pointer; font-size: 12px; padding: 0; transition: color 0.15s; flex-shrink: 0; }
+  .item-remove:hover { color: #F87171; }
+  .drag-handle { color: var(--stone); font-size: 11px; cursor: grab; flex-shrink: 0; padding-top: 2px; }
+  .itinerary-actions { display: flex; flex-direction: column; gap: 8px; }
+  .btn-canva { width: 100%; background: linear-gradient(135deg, #7B61FF, #00C4CC); color: var(--white); border: none; border-radius: 9px; padding: 12px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .btn-canva:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(123,97,255,0.4); }
+  .btn-canva:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-clear { width: 100%; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 9px; padding: 8px; color: var(--stone); font-family: 'DM Sans', sans-serif; font-size: 11px; cursor: pointer; transition: all 0.18s; }
+  .btn-clear:hover { border-color: var(--stone); color: var(--white); }
+  .notification { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--pine-mid); border: 1px solid rgba(91,155,174,0.4); border-radius: 9px; padding: 10px 18px; font-size: 12px; color: var(--glacier-light); box-shadow: var(--shadow); transition: transform 0.3s ease; z-index: 200; white-space: nowrap; }
+  .notification.show { transform: translateX(-50%) translateY(0); }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🏔</div>
+      <div class="logo-text">
+        <h1>Glacier Itinerary Builder</h1>
+        <p>Personal Dashboard · Brittany in MT</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-dot"></div>
+      <span id="itemCount">Loading...</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="filter-panel">
+      <div class="panel-title">Filters</div>
+      <div class="filter-group">
+        <span class="filter-label">Trip Length</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="1-Day" onclick="toggleFilter(this)">1 Day</button>
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="3-Day" onclick="toggleFilter(this)">3 Days</button>
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="7-Day" onclick="toggleFilter(this)">7 Days</button>
+          <button class="toggle-btn gold" data-filter="tripLength" data-value="Any Length" onclick="toggleFilter(this)">Any</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-group">
+        <span class="filter-label">Season</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn" data-filter="season" data-value="Summer" onclick="toggleFilter(this)">☀️ Summer</button>
+          <button class="toggle-btn" data-filter="season" data-value="Fall" onclick="toggleFilter(this)">🍂 Fall</button>
+          <button class="toggle-btn" data-filter="season" data-value="Winter" onclick="toggleFilter(this)">❄️ Winter</button>
+          <button class="toggle-btn" data-filter="season" data-value="Spring" onclick="toggleFilter(this)">🌱 Spring</button>
+          <button class="toggle-btn" data-filter="season" data-value="Year-Round" onclick="toggleFilter(this)">🗓 Year-Round</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-group">
+        <span class="filter-label">Area of Park</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn sage" data-filter="area" data-value="Going-to-the-Sun Road" onclick="toggleFilter(this)">GTSR</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="West Side / Lake McDonald" onclick="toggleFilter(this)">West Side</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="East Side / St. Mary" onclick="toggleFilter(this)">East Side</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Many Glacier" onclick="toggleFilter(this)">Many Glacier</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Two Medicine" onclick="toggleFilter(this)">Two Medicine</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="North Fork / Polebridge" onclick="toggleFilter(this)">North Fork</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Cut Bank" onclick="toggleFilter(this)">Cut Bank</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Apgar" onclick="toggleFilter(this)">Apgar</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Waterton" onclick="toggleFilter(this)">Waterton</button>
+          <button class="toggle-btn sage" data-filter="area" data-value="Park-Wide" onclick="toggleFilter(this)">Park-Wide</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-group">
+        <span class="filter-label">Content Type</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn" data-filter="contentType" data-value="Hiking" onclick="toggleFilter(this)">🥾 Hiking</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Sightseeing" onclick="toggleFilter(this)">📸 Sightseeing</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Businesses & Services" onclick="toggleFilter(this)">🍽 Businesses</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Wildlife & Safety" onclick="toggleFilter(this)">🐻 Wildlife</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Travel Info & Logistics" onclick="toggleFilter(this)">🚗 Logistics</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Park Overview" onclick="toggleFilter(this)">🏔 Overview</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Seasonal" onclick="toggleFilter(this)">🗓 Seasonal</button>
+          <button class="toggle-btn" data-filter="contentType" data-value="Park Offerings" onclick="toggleFilter(this)">⛺ Offerings</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-group">
+        <span class="filter-label">Difficulty</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn" data-filter="difficulty" data-value="Easy" onclick="toggleFilter(this)">Easy</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="Moderate" onclick="toggleFilter(this)">Moderate</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="Strenuous" onclick="toggleFilter(this)">Strenuous</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="Very Strenuous" onclick="toggleFilter(this)">Very Strenuous</button>
+          <button class="toggle-btn" data-filter="difficulty" data-value="N/A" onclick="toggleFilter(this)">N/A</button>
+        </div>
+      </div>
+      <div class="filter-divider"></div>
+      <div class="filter-group">
+        <span class="filter-label">Itinerary Ready</span>
+        <div class="toggle-grid">
+          <button class="toggle-btn active" id="readyBtn" onclick="toggleReady(this)">✅ Ready only</button>
+        </div>
+      </div>
+      <button class="btn-reset" onclick="resetFilters()">↺ Reset all filters</button>
+    </div>
+
+    <div class="content-area">
+      <div class="content-header">
+        <h2>Content Library</h2>
+        <span class="result-count" id="resultCount">— items</span>
+      </div>
+      <div class="cards-grid" id="cardsGrid"></div>
+    </div>
+
+    <div class="itinerary-panel">
+      <div class="panel-title">Itinerary Builder</div>
+      <p class="itinerary-subtitle">Click cards to add · Drag to reorder</p>
+      <input class="trip-name-input" id="tripName" placeholder="Name this itinerary..." />
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-empty" id="dropEmpty">
+          <div class="dz-icon">📋</div>
+          <p>Select content cards to build your itinerary</p>
+        </div>
+        <div id="itineraryItems"></div>
+      </div>
+      <div class="itinerary-actions">
+        <button class="btn-canva" id="canvaBtn" onclick="buildInCanva()" disabled><span>✦</span> Build in Canva</button>
+        <button class="btn-clear" onclick="clearItinerary()">Clear itinerary</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="notification" id="notification"></div>
+
+<script>
+// ── ALL YOUR NOTION DATA BAKED IN ──
+const ALL_CARDS = [
+  {id:"30ec752cb26480a09176d3cb61e87151",title:"12 Days of Glacier- Hidden Lake Overlook",contentType:"Hiking",area:["Going-to-the-Sun Road"],season:["Summer"],tripLength:["1-Day","3-Day","7-Day","Any Length"],difficulty:"Easy",itineraryReady:"✅ Yes",notes:"Top 5 hike — mountain goats, bighorn sheep, possible grizzly. 3mi / 500ft gain to overlook. 5.1mi to lake. Best at sunset."},
+  {id:"30ec752cb264806e9f91d49b32ec5b27",title:"12 Days of Glacier- Many Glacier",contentType:"Sightseeing",area:["Many Glacier"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Historic Many Glacier Hotel, Swiftcurrent Lake, boat tours to Grinnell Glacier. Most dramatic valley in the park."},
+  {id:"30ec752cb264809ab304dd68d153a485",title:"12 Days of Glacier- Glacier Overview + Vehicle Reservation",contentType:"Travel Info & Logistics",area:["Park-Wide"],season:["Summer"],tripLength:["1-Day","3-Day","7-Day","Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"2026 update: No vehicle reservations required. Logan Pass has 3-hour time-limited parking. Ticketed shuttle system."},
+  {id:"30fc752cb264801c8828ff8d2377b36e",title:"Safety- Water in Glacier",contentType:"Wildlife & Safety",area:["Park-Wide"],season:["Year-Round"],tripLength:["Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Never drink untreated water in the park. All water sources require filtration or treatment."},
+  {id:"30fc752cb26480c5a508ee7a086e693f",title:"Visiting Glacier in May",contentType:"Seasonal",area:["Park-Wide"],season:["Spring"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"GTSR not yet open. West side accessible. Great for fewer crowds, waterfalls at peak flow from snowmelt."},
+  {id:"30ec752cb26480d48ad8d988432c8dd8",title:"Glacier Through the Year- March",contentType:"Seasonal",area:["Park-Wide"],season:["Winter","Spring"],tripLength:["1-Day","3-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Park open on west side to Lake McDonald Lodge. Snowshoeing, cross-country skiing available."},
+  {id:"30ec752cb264808bb2abdb3de180b5d9",title:"Food- Around West Glacier",contentType:"Businesses & Services",area:["West Side / Lake McDonald"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Restaurants and food options near West Glacier entrance."},
+  {id:"30fc752cb26480e2818ad2f63e0f4f44",title:"Where to Stay in & Around Glacier",contentType:"Businesses & Services",area:["Park-Wide"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Lodging options inside and outside the park — from camping to historic lodges."},
+  {id:"30ec752cb26480adaedeedf7d752afb8",title:"12 Days of Glacier- Camping",contentType:"Park Offerings",area:["Park-Wide"],season:["Summer","Fall"],tripLength:["3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Campgrounds inside and outside the park. Reserve early — fills fast. Apgar, Fish Creek, St. Mary, Many Glacier all popular."},
+  {id:"30ec752cb264802fa601cd77de2be2ac",title:"Glacier National Park in the Winter",contentType:"Seasonal",area:["West Side / Lake McDonald"],season:["Winter"],tripLength:["1-Day","3-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Ranger-led snowshoe walks Sat/Sun at Apgar 1pm, $2 rental. Glacier Hikes and Bikes for weekday tours."},
+  {id:"30ec752cb26480d4af3ad36b6a735fd0",title:"Glacier Through the Year- April",contentType:"Seasonal",area:["Park-Wide"],season:["Spring"],tripLength:["1-Day","3-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Shoulder season — fewer crowds. Lower elevation trails opening. GTSR still closed at higher elevations."},
+  {id:"30ec752cb2648041b935d1c3bb391252",title:"Business Bite- Glacier Hikes and Bikes",contentType:"Businesses & Services",area:["West Side / Lake McDonald"],season:["Summer","Fall","Winter"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Guided tours for hiking and biking in summer, snowshoeing in winter. Great for weekday winter visitors."},
+  {id:"30ec752cb264802fa6c7fb0e4c721bf6",title:"2026 Glacier Airport Update",contentType:"Travel Info & Logistics",area:["Park-Wide"],season:["Year-Round"],tripLength:["Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Glacier Park International Airport (FCA) in Kalispell serves the area. Updated flight routes for 2026."},
+  {id:"30fc752cb26480adb92ec1db33ff1494",title:"Huckleberry Picking in Glacier",contentType:"Park Offerings",area:["Park-Wide"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"Easy",itineraryReady:"✅ Yes",notes:"Late July through September. Personal use allowed. One of Montana's most iconic seasonal activities."},
+  {id:"30ec752cb264806e89a3e389f7525a6a",title:"12 Days of Glacier- Whitewater Rafting",contentType:"Park Offerings",area:["West Side / Lake McDonald"],season:["Summer"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"Moderate",itineraryReady:"✅ Yes",notes:"Middle Fork of the Flathead River runs along the south boundary. Several outfitters offer half-day and full-day trips."},
+  {id:"30ec752cb26480929c37e7e620ca5a0b",title:"12 Days of Glacier- Two Medicine",contentType:"Sightseeing",area:["Two Medicine"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Most underrated area of the park. Boat tours available. Glacier Park Lodge in East Glacier nearby for history."},
+  {id:"30ec752cb26480f48421f4cae30913cd",title:"12 Days of Glacier- The North Fork",contentType:"Sightseeing",area:["North Fork / Polebridge"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Polebridge Mercantile for huckleberry bear claws. Home Ranch Bottoms for lunch. Unpaved roads."},
+  {id:"30ec752cb264807a847fc29a667156fc",title:"12 Days of Glacier- Avalanche Lake",contentType:"Hiking",area:["West Side / Lake McDonald"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"Moderate",itineraryReady:"✅ Yes",notes:"4.6mi round trip / 500ft gain. Trail of the Cedars loop first. Turquoise lake surrounded by canyon walls. Very popular — go early."},
+  {id:"30ec752cb26480f99f38e1943001787a",title:"Business Bite- West Glacier KOA",contentType:"Businesses & Services",area:["West Side / Lake McDonald"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Campground and cabins just outside West Glacier entrance. Good base camp option."},
+  {id:"30ec752cb264806abe38dc053a4fd11c",title:"12 Days of Glacier- Apgar Village",contentType:"Sightseeing",area:["Apgar","West Side / Lake McDonald"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Small village at west entrance. Visitor center, kayak rentals, gift shops, restaurant. Great first stop."},
+  {id:"30ec752cb26480eb9d91c8bf10e2d1b0",title:"12 Days of Glacier - Red Bus Tour",contentType:"Park Offerings",area:["Park-Wide"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Historic 1930s red jammers with roll-back tops. Guided tours along GTSR. Book well in advance."},
+  {id:"30ec752cb264805e8572f0e83a46cc8b",title:"12 Days of Glacier- Glacier Park Boat Company",contentType:"Businesses & Services",area:["West Side / Lake McDonald","Two Medicine","East Side / St. Mary","Many Glacier","Apgar"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Family owned since 1938. Boat tours at Lake McDonald, Two Medicine, St. Mary, Many Glacier. Book 1+ month ahead."},
+  {id:"30ec752cb264809bb304dd68d153a485",title:"12 Days of Glacier- Going-to-the-Sun Road",contentType:"Sightseeing",area:["Going-to-the-Sun Road"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day","Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"52 miles, late June–mid October. 2hrs one way without stops. Bird Woman Falls, Big Bend pull-offs. Heights warning."},
+  {id:"30ec752cb26480cd9bb6fa5c6f13606f",title:"Top 5 Things to Do in the Park",contentType:"Park Overview",area:["Park-Wide"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"GTSR drive, Two Medicine, North Fork, kayaking Lake McDonald, hiking. Great overview for any itinerary intro."},
+  {id:"30ec752cb264801f80a8e710f6ec72e5",title:"GNP in the Winter",contentType:"Seasonal",area:["West Side / Lake McDonald","Apgar"],season:["Winter"],tripLength:["1-Day","3-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Ranger snowshoe walks Sat/Sun 1pm at Apgar. $2 rental. Park open west side to Lake McDonald Lodge year-round."},
+  {id:"30ec752cb2648088b3a5debbf42894d3",title:"2025 Hiking Wrapped",contentType:"Hiking",area:["Two Medicine","West Side / Lake McDonald","East Side / St. Mary","Many Glacier"],season:["Summer","Fall"],tripLength:["3-Day","7-Day"],difficulty:"Moderate",itineraryReady:"⚠️ Needs Editing",notes:"15 hikes including Scenic Point, Ptarmigan/Dawson Loop, Siyeh Pass (top 3 all-time). Great source for individual hike entries."},
+  {id:"30ec752cb26480a48b84f044bc54f76b",title:"Waterton National Park",contentType:"Sightseeing",area:["Waterton"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Canada's side of the International Peace Park. Prince of Wales Hotel iconic viewpoint. Passport required."},
+  {id:"30ec752cb264808dbea2ee056b4ee737",title:"Hiking- Dawson Pitamakin",contentType:"Hiking",area:["Two Medicine"],season:["Summer","Fall"],tripLength:["3-Day","7-Day"],difficulty:"Very Strenuous",itineraryReady:"✅ Yes",notes:"18-20 mile loop. Do not attempt unprepared. If not doing full loop, hike to No Name Lake instead. Epic views."},
+  {id:"30ec752cb26480538ab5ca79036a51d7",title:"Best Time to Visit",contentType:"Park Overview",area:["Park-Wide"],season:["Year-Round"],tripLength:["Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"July–August peak season. September for fall colors and fewer crowds. Each season has something special."},
+  {id:"30ec752cb2648020b090dd6892cb1a86",title:"What to Expect- September",contentType:"Seasonal",area:["Park-Wide"],season:["Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Fall colors, fewer crowds, wildlife very active. Some facilities closing. Huckleberries still available early Sept."},
+  {id:"30fc752cb264806ea21ec51de15ee09c",title:"Bear Spray Safety",contentType:"Wildlife & Safety",area:["Park-Wide"],season:["Year-Round"],tripLength:["Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Required for all hiking. How to carry, when to use, where to rent/buy. Essential safety info for every visitor."},
+  {id:"30ec752cb26480b181ace68b983f2c98",title:"Sightseeing Activities",contentType:"Sightseeing",area:["Park-Wide"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Scenic viewpoints, pull-offs, and non-hiking activities throughout the park."},
+  {id:"30ec752cb264808bb2abdb3de180b5d9",title:"Food- Around West Glacier",contentType:"Businesses & Services",area:["West Side / Lake McDonald"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Belton Chalet, Freda's Bar, West Glacier Restaurant and options near the west entrance."},
+  {id:"30fc752cb26480caa996c7baedbd7cdd",title:"Business Bites- Belton Chalet",contentType:"Businesses & Services",area:["West Side / Lake McDonald"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Historic lodge right outside West Glacier. Great food, cozy atmosphere. Make reservations in peak season."},
+  {id:"30ec752cb2648076bd6cf17598f35776",title:"Food- Columbia Falls",contentType:"Businesses & Services",area:["West Side / Lake McDonald"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Restaurants and food options in Columbia Falls, 15 min from West Glacier."},
+  {id:"30fc752cb264806ea21ec51de15ee09c2",title:"Hiking recs- Two Medicine",contentType:"Hiking",area:["Two Medicine"],season:["Summer","Fall"],tripLength:["1-Day","3-Day","7-Day"],difficulty:"Moderate",itineraryReady:"✅ Yes",notes:"Scenic Point, Rockwell Falls, Cobalt Lake, Aster Falls. Least crowded major area of the park."},
+  {id:"30fc752cb26480c2913bc1cc7e097b72",title:"What's in my bag",contentType:"Travel Info & Logistics",area:["Park-Wide"],season:["Year-Round"],tripLength:["Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Packing list for a day in Glacier — layers, sunscreen, bear spray, water, snacks, binoculars."},
+  {id:"30ec752cb264809bb810cb9c3908856a",title:"Park Updates- Text Messaging",contentType:"Travel Info & Logistics",area:["Park-Wide"],season:["Year-Round"],tripLength:["Any Length"],difficulty:"N/A",itineraryReady:"✅ Yes",notes:"Sign up for NPS text alerts for road closures and park updates. Helpful for real-time planning."},
+];
+
+const state = {
+  selectedIds: new Set(), itinerary: [], dragSrcIndex: null,
+  filters: { tripLength:[], season:[], area:[], contentType:[], difficulty:[] },
+  readyOnly: true
+};
+
+window.onload = () => {
+  document.getElementById('itemCount').textContent = ALL_CARDS.length + ' items loaded';
+  applyFilters();
+};
+
+function toggleFilter(btn) {
+  const key = btn.dataset.filter, val = btn.dataset.value;
+  const arr = state.filters[key], idx = arr.indexOf(val);
+  if (idx > -1) { arr.splice(idx,1); btn.classList.remove('active'); }
+  else { arr.push(val); btn.classList.add('active'); }
+  applyFilters();
+}
+function toggleReady(btn) { state.readyOnly = !state.readyOnly; btn.classList.toggle('active', state.readyOnly); applyFilters(); }
+function resetFilters() {
+  state.filters = { tripLength:[], season:[], area:[], contentType:[], difficulty:[] };
+  state.readyOnly = true;
+  document.querySelectorAll('.toggle-btn[data-filter]').forEach(b => b.classList.remove('active'));
+  document.getElementById('readyBtn').classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  let cards = ALL_CARDS;
+  const f = state.filters;
+  if (state.readyOnly) cards = cards.filter(c => c.itineraryReady === '✅ Yes');
+  if (f.tripLength.length) cards = cards.filter(c => f.tripLength.some(v => c.tripLength.includes(v) || c.tripLength.includes('Any Length')));
+  if (f.season.length) cards = cards.filter(c => f.season.some(v => c.season.includes(v) || c.season.includes('Year-Round')));
+  if (f.area.length) cards = cards.filter(c => f.area.some(v => c.area.includes(v) || c.area.includes('Park-Wide')));
+  if (f.contentType.length) cards = cards.filter(c => f.contentType.includes(c.contentType));
+  if (f.difficulty.length) cards = cards.filter(c => f.difficulty.includes(c.difficulty));
+  document.getElementById('resultCount').textContent = cards.length + ' items';
+  renderCards(cards);
+}
+
+const typeMap = {'Hiking':'type-hiking','Sightseeing':'type-sightseeing','Park Overview':'type-overview','Travel Info & Logistics':'type-logistics','Businesses & Services':'type-business','Wildlife & Safety':'type-wildlife','Seasonal':'type-seasonal','Park Offerings':'type-offerings'};
+
+function renderCards(cards) {
+  const grid = document.getElementById('cardsGrid');
+  if (!cards.length) { grid.innerHTML = '<div class="empty-state"><div class="ei">🔍</div><h3>No matches</h3><p>Try adjusting your filters.</p></div>'; return; }
+  grid.innerHTML = cards.map(card => {
+    const sel = state.selectedIds.has(card.id);
+    const tags = [...new Set([...card.area.slice(0,2), ...card.season.slice(0,1)])];
+    return `<div class="card ${sel?'selected':''}" onclick="toggleCard('${card.id}',this)" data-id="${card.id}">
+      <div class="card-check">✓</div>
+      <div class="card-type ${typeMap[card.contentType]||'type-other'}">${card.contentType||'Other'}</div>
+      <div class="card-title">${card.title}</div>
+      ${card.notes?`<div class="card-notes">${card.notes}</div>`:''}
+      <div class="card-meta">
+        ${card.difficulty&&card.difficulty!=='N/A'?`<span class="meta-tag">⛰ ${card.difficulty}</span>`:''}
+        ${tags.map(t=>`<span class="meta-tag">${t}</span>`).join('')}
+      </div></div>`;
+  }).join('');
+}
+
+function toggleCard(id, el) {
+  const card = ALL_CARDS.find(c => c.id === id);
+  if (!card) return;
+  if (state.selectedIds.has(id)) { state.selectedIds.delete(id); el.classList.remove('selected'); state.itinerary = state.itinerary.filter(c=>c.id!==id); }
+  else { state.selectedIds.add(id); el.classList.add('selected'); state.itinerary.push(card); showNotification('Added: '+card.title); }
+  renderItinerary();
+}
+
+function renderItinerary() {
+  const container = document.getElementById('itineraryItems'), empty = document.getElementById('dropEmpty'), btn = document.getElementById('canvaBtn');
+  if (!state.itinerary.length) { container.innerHTML=''; empty.style.display='flex'; btn.disabled=true; return; }
+  empty.style.display='none'; btn.disabled=false;
+  container.innerHTML = state.itinerary.map((card,i) => `
+    <div class="itinerary-item" draggable="true" ondragstart="dragStart(event,${i})" ondragover="dragOver(event,${i})" ondrop="dragDrop(event,${i})" ondragend="dragEnd()">
+      <span class="drag-handle">⠿</span>
+      <div class="item-num">${i+1}</div>
+      <div class="item-content"><div class="item-title">${card.title}</div><div class="item-type">${card.contentType}</div></div>
+      <button class="item-remove" onclick="removeItem('${card.id}')">✕</button>
+    </div>`).join('');
+}
+
+function removeItem(id) { state.itinerary=state.itinerary.filter(c=>c.id!==id); state.selectedIds.delete(id); const el=document.querySelector(`.card[data-id="${id}"]`); if(el) el.classList.remove('selected'); renderItinerary(); }
+function clearItinerary() { state.itinerary=[]; state.selectedIds.clear(); document.querySelectorAll('.card.selected').forEach(c=>c.classList.remove('selected')); renderItinerary(); }
+function dragStart(e,i) { state.dragSrcIndex=i; setTimeout(()=>e.target.classList.add('dragging'),0); }
+function dragOver(e,i) { e.preventDefault(); }
+function dragDrop(e,i) { e.preventDefault(); if(state.dragSrcIndex===null||state.dragSrcIndex===i) return; const moved=state.itinerary.splice(state.dragSrcIndex,1)[0]; state.itinerary.splice(i,0,moved); renderItinerary(); }
+function dragEnd() { state.dragSrcIndex=null; document.querySelectorAll('.itinerary-item.dragging').forEach(el=>el.classList.remove('dragging')); }
+
+function buildInCanva() {
+  if (!state.itinerary.length) return;
+  const name = document.getElementById('tripName').value || 'Glacier National Park Itinerary';
+  const sections = state.itinerary.map((c,i)=>`${i+1}. ${c.title}${c.notes?' — '+c.notes.slice(0,80):''}`).join(', ');
+  const query = encodeURIComponent(`${name} — Glacier National Park travel itinerary with teal and forest green design. Sections: ${sections.slice(0,400)}`);
+  window.open(`https://www.canva.com/create/documents/?query=${query}`, '_blank');
+  showNotification('✦ Opening Canva with your itinerary!');
+}
+
+function showNotification(msg) { const el=document.getElementById('notification'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
+</script>
+</body>
+</html>
